@@ -1,6 +1,6 @@
 # Log Scrubber — User Guide
 
-**Machine Data Insights Inc.** | [machinedatainsights.com](https://machinedatainsights.com)
+**Machine Data Insights Inc.** | <a href="https://machinedatainsights.com" target="_blank">machinedatainsights.com</a>
 
 `log_scrubber.py` is a standalone command-line utility for scrubbing PII and sensitive data from Splunk field-value exports and log samples. Uses the same scrubbing algorithm and configuration format as the CIM Automation Suite (CAS) web interface.
 
