@@ -1,0 +1,62 @@
+# Log Scrubbing Configuration
+# This file is automatically loaded when scrubbing is enabled
+# You can override it by uploading a custom config in the UI
+# Comments and blank lines are ignored
+
+# Format: search_term,replacement_mode,replacement_values
+# replacement_modes: single, random
+
+# Company names - customize for your organization
+"ACME Corp",single,"CompanyA"
+ACME,single,COMP
+
+# Network ranges - add your internal ranges
+192.168,single,10.0
+172.16,single,10.1
+
+# Email domains
+"@acme.com",single,"@company.com"
+john.doe@example.com,random,"user1@company.com,user2@company.com,user3@company.com"
+
+# JSON 
+# @json rules support three config formats:
+# 3-column (implicit single — backward compatible)
+# @json,accessKeyId,REDACTED_KEY
+
+# 4-column explicit single
+# @json,principalId,single,REDACTED_ID
+
+# 4-column random
+# @json,accountId,random,"000000000001,000000000002,000000000003"
+# @json,Owner,random,"user_a@example.com,user_b@example.com,user_c@example.com"
+
+# AWS — common sensitive fields across CloudTrail, GuardDuty, etc.
+@json,sourceIPAddress,10.0.0.x
+@json,userIdentity.arn,arn:aws:iam::123456789012:user/REDACTED
+@json,userIdentity.principalId,REDACTED_PRINCIPAL
+@json,requestParameters.bucketName,example-bucket
+@json,responseElements.instancesSet.instanceId,i-0123456789abcdef0
+@json,"accountId","123456789012"
+@json,"account_id","123456789012"
+@json,"dest","i-wannabeabigrockstar"
+@json,"BuildUser","contractor"
+@json,"resource.accessKeyDetails.accessKeyId","ABCDEFTHIJKLMNOP12345678"
+@json,"resource.accessKeyDetails.principalId","ABCDEFGHIJKLMNOP12345678:hostId"
+@json,"resource.accessKeyDetails.userName","AWS-ENGINEERING"
+@json,"resource.eksClusterDetails.arn","arn:aws-us-love:eks:us-love-west-1:123456789:cluster/k8s"
+@json,"resource.instanceDetails.instanceId","i-wannabeabigrockstar"
+
+# Azure — common fields
+@json,tenantId,00000000-0000-0000-0000-000000000000
+@json,callerIpAddress,10.0.0.x
+@json,upn,user@example.com
+
+# Okta
+@json,client.ipAddress,10.0.0.x
+@json,actor.alternateId,user@example.com
+
+# Tag key-value pairs (AWS/Azure/GCP — matches {"key":"X","value":"Y"})
+@json,Owner,random,"user_a@example.com,user_b@example.com"
+@json,CreatedBy,random,"user_a@example.com,user_b@example.com"
+@json,Name,REDACTED_NAME
+@json,Environment,random,"dev,staging,production"
