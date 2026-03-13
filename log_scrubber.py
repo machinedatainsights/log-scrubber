@@ -111,7 +111,7 @@ def parse_scrubbing_config(config_path: str) -> Tuple[list, list]:
                         else:
                             text_rules.append((first, mode, row[2].strip()))
     except Exception as e:
-        print(f"  ⚠ Warning: Could not parse config '{config_path}': {e}", file=sys.stderr)
+        print(f"  [!] Warning: Could not parse config '{config_path}': {e}", file=sys.stderr)
 
     return text_rules, json_field_rules
 
@@ -358,6 +358,11 @@ def scrub_text(text: str, text_rules: list, json_field_rules: list,
         r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
         "user@example.com", scrubbed,
     )
+    # AWS-style ip- hostnames (e.g., ip-10-50-26-117.us-gov-west-1.compute.internal)
+    scrubbed = re.sub(
+        r"\bip-\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}\b",
+        "ip-10-0-0-x", scrubbed,
+    )
     scrubbed = re.sub(
         r"\b[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+\.(com|net|org|io|local|internal)\b",
         "host.example.com", scrubbed,
@@ -397,17 +402,17 @@ def scrub_text(text: str, text_rules: list, json_field_rules: list,
 # ============================================================================
 
 def scrub_fieldsummary_csv(input_path: str, output_path: str,
-                           text_rules: list, json_field_rules: list) -> dict:
+                           text_rules: list, json_field_rules: list,
+                           include_raw: bool = False) -> dict:
     """
     Scrub a Splunk fieldsummary CSV export.
 
-    Expected columns from Splunk: field, count, distinct_count, is_exact,
-    max, mean, min, numeric_count, stdev, values
+    Supports two input formats:
+      1. Splunk fieldsummary: columns include "field" and "values"
+      2. CAS web UI export:  columns include "Field Name", "Raw Values", "Scrubbed Values"
 
-    The 'values' column contains fieldsummary-formatted sample values like:
-        [{"value":"192.168.1.1","count":5},{"value":"admin@corp.com","count":3}]
-
-    Adds a 'scrubbed_values' column with the scrubbed version.
+    By default, outputs only the scrubbed values (no raw column).
+    Use include_raw=True to keep the original raw values column.
     """
     stats = {"rows": 0, "scrubbed": 0, "skipped": 0}
 
@@ -417,28 +422,64 @@ def scrub_fieldsummary_csv(input_path: str, output_path: str,
     with open(input_path, "r", encoding="utf-8", errors="replace") as fin:
         reader = csv.DictReader(fin)
         if not reader.fieldnames:
-            print(f"  ⚠ Empty or invalid CSV: {input_path}", file=sys.stderr)
+            print(f"  [!] Empty or invalid CSV: {input_path}", file=sys.stderr)
             return stats
 
         # Determine the values column name
+        # Supports Splunk fieldsummary format ("values") and CAS export format ("Raw Values")
         values_col = None
-        for candidate in ("values", "Values", "VALUES"):
+        for candidate in ("values", "Values", "VALUES", "Raw Values", "raw_values"):
             if candidate in reader.fieldnames:
                 values_col = candidate
                 break
 
         # Determine the field name column
         field_col = None
-        for candidate in ("field", "Field", "FIELD", "field_name"):
+        for candidate in ("field", "Field", "FIELD", "field_name", "Field Name", "Field_Name"):
             if candidate in reader.fieldnames:
                 field_col = candidate
                 break
 
-        # Build output fieldnames with scrubbed_values added after values
+        # Determine if there's an existing scrubbed column (CAS export format)
+        existing_scrubbed_col = None
+        for candidate in ("Scrubbed Values", "scrubbed_values", "Scrubbed_Values"):
+            if candidate in reader.fieldnames:
+                existing_scrubbed_col = candidate
+                break
+
+        # Build output fieldnames
         out_fields = list(reader.fieldnames)
-        if values_col and "scrubbed_values" not in out_fields:
+        if existing_scrubbed_col:
+            scrubbed_output_col = existing_scrubbed_col
+        elif values_col and "scrubbed_values" not in out_fields:
             idx = out_fields.index(values_col) + 1
             out_fields.insert(idx, "scrubbed_values")
+            scrubbed_output_col = "scrubbed_values"
+        else:
+            scrubbed_output_col = "scrubbed_values"
+
+        # Remove raw values column from output unless --include-raw
+        if not include_raw and values_col and values_col in out_fields:
+            out_fields.remove(values_col)
+
+        # Rename scrubbed column to clean name for output
+        # (e.g., "scrubbed_values" → "Scrubbed Values" for readability)
+        col_rename = {}
+        if scrubbed_output_col == "scrubbed_values" and "scrubbed_values" in out_fields:
+            idx = out_fields.index("scrubbed_values")
+            out_fields[idx] = "Scrubbed Values"
+            col_rename["scrubbed_values"] = "Scrubbed Values"
+            scrubbed_output_col_out = "Scrubbed Values"
+        else:
+            scrubbed_output_col_out = scrubbed_output_col
+
+        # Normalize field name column header for clean output
+        field_col_out = field_col
+        if field_col and field_col in ("field", "Field", "FIELD") and field_col in out_fields:
+            idx = out_fields.index(field_col)
+            out_fields[idx] = "Field Name"
+            col_rename[field_col] = "Field Name"
+            field_col_out = "Field Name"
 
         with open(output_path, "w", encoding="utf-8", newline="") as fout:
             writer = csv.DictWriter(fout, fieldnames=out_fields, extrasaction="ignore")
@@ -452,13 +493,20 @@ def scrub_fieldsummary_csv(input_path: str, output_path: str,
                 if raw_values.strip():
                     scrubbed = scrub_text(raw_values, text_rules, json_field_rules,
                                           field_name=field_name)
-                    row["scrubbed_values"] = scrubbed
+                    row[scrubbed_output_col] = scrubbed
                     stats["scrubbed"] += 1
                 else:
-                    row["scrubbed_values"] = ""
+                    if not existing_scrubbed_col:
+                        row[scrubbed_output_col] = ""
                     stats["skipped"] += 1
 
-                writer.writerow(row)
+                # Apply column renames for output
+                out_row = {}
+                for col in out_fields:
+                    # Find source column (check rename map)
+                    src_col = next((k for k, v in col_rename.items() if v == col), col)
+                    out_row[col] = row.get(src_col, row.get(col, ""))
+                writer.writerow(out_row)
 
     return stats
 
@@ -662,6 +710,11 @@ Export SPL for log samples (Splunk Web → Export → CSV):
         help="Show what would be done without writing output",
     )
     parser.add_argument(
+        "--include-raw",
+        action="store_true",
+        help="Include the original raw values column in fieldsummary output (default: scrubbed only)",
+    )
+    parser.add_argument(
         "--quiet", "-q",
         action="store_true",
         help="Suppress informational output",
@@ -704,27 +757,30 @@ Export SPL for log samples (Splunk Web → Export → CSV):
 
     # Process
     if args.mode == "fieldsummary":
+        include_raw = args.include_raw
         stats = scrub_fieldsummary_csv(args.input, output_path,
-                                        text_rules, json_field_rules)
+                                        text_rules, json_field_rules,
+                                        include_raw=include_raw)
         if not args.quiet:
-            print(f"  ✅ Scrubbed {stats['scrubbed']}/{stats['rows']} fields")
+            print(f"  [OK] Scrubbed {stats['scrubbed']}/{stats['rows']} fields")
             print(f"     Skipped {stats['skipped']} empty fields")
     else:
         stats = scrub_samples_csv(args.input, output_path,
                                    text_rules, json_field_rules)
         if not args.quiet:
-            print(f"  ✅ Scrubbed {stats['scrubbed']}/{stats['events']} events")
+            print(f"  [OK] Scrubbed {stats['scrubbed']}/{stats['events']} events")
 
     if not args.quiet:
-        print(f"  📄 Output: {output_path}")
+        print(f"  [>>] Output: {output_path}")
 
 
 if __name__ == "__main__":
     print()
-    print("═══════════════════════════════════════════════════")
+    print("===================================================")
     print("  Log Scrubber v1.0.0")
-    print("  Machine Data Insights")
-    print("═══════════════════════════════════════════════════")
+    print("  CIM Automation Suite - Machine Data Insights")
+    print("  machinedatainsights.com")
+    print("===================================================")
     print()
     main()
     print()

@@ -9,18 +9,42 @@
 ```
 log_scrubber/
 ├── log_scrubber.py
-└── log_scrubbing_config.csv    ← place your config here
+├── log_scrubbing_config.csv    ← place your config here
+└── LOG_SCRUBBER_GUIDE.md
 ```
 
 ```bash
-# Scrub a fieldsummary export
+# Scrub a fieldsummary export (outputs scrubbed values only)
 python log_scrubber.py fieldsummary my_fields.csv
+
+# Scrub a fieldsummary export (include raw values for comparison)
+python log_scrubber.py fieldsummary my_fields.csv --include-raw
 
 # Scrub log samples
 python log_scrubber.py samples my_events.csv
 ```
 
 Output is written to `my_fields_scrubbed_20260227_103045.csv` (auto-timestamped).
+
+## Output Format
+
+### Fieldsummary Mode
+
+By default, the output contains **scrubbed values only** — the raw values column is removed so the output is safe to share:
+
+```
+Field Name, Scrubbed Values, Count, Distinct Count
+```
+
+Use `--include-raw` to keep the original raw values alongside the scrubbed values (useful for reviewing what was changed):
+
+```
+Field Name, Raw Values, Scrubbed Values, Count, Distinct Count
+```
+
+### Samples Mode
+
+Log sample events are scrubbed in place — the output file contains only scrubbed events.
 
 ## Step-by-Step Workflow
 
@@ -58,7 +82,7 @@ python log_scrubber.py samples guardduty_samples.csv
 
 ### 4. Review and Send
 
-Check the `*_scrubbed_*` output files to verify sensitive data was replaced, then email the scrubbed files for CAS processing.
+Check the `*_scrubbed_*` output files to verify sensitive data was replaced, then email the scrubbed files for processing.
 
 ## Configuration
 
@@ -86,6 +110,7 @@ Even without a config file, the scrubber applies these regex patterns automatica
 | Pattern | Replacement |
 |---------|-------------|
 | IP addresses (`192.168.1.50`) | `10.0.0.x` |
+| AWS ip- hostnames (`ip-10-50-26-117`) | `ip-10-0-0-x` |
 | Email addresses (`admin@corp.com`) | `user@example.com` |
 | FQDN hostnames (`server01.company.com`) | `host.example.com` |
 | UNC paths (`\\server\share`) | `\\SERVER\SHARE` |
@@ -149,7 +174,7 @@ my-splunk-server,single,splunk-host
 
 ```
 usage: log_scrubber.py [-h] [--config CONFIG] [--output OUTPUT]
-                       [--dry-run] [--quiet]
+                       [--include-raw] [--dry-run] [--quiet]
                        {fieldsummary,samples} input
 ```
 
@@ -160,6 +185,7 @@ usage: log_scrubber.py [-h] [--config CONFIG] [--output OUTPUT]
 | `input` | Input file path |
 | `--config`, `-c` | Path to scrubbing config CSV (auto-detected if not specified) |
 | `--output`, `-o` | Output file path (default: `<input>_scrubbed_<timestamp>.<ext>`) |
+| `--include-raw` | Include the original raw values column in fieldsummary output (default: scrubbed only) |
 | `--dry-run` | Show what would be done without writing output |
 | `--quiet`, `-q` | Suppress informational output |
 
@@ -167,13 +193,12 @@ usage: log_scrubber.py [-h] [--config CONFIG] [--output OUTPUT]
 
 ### Fieldsummary Mode
 
-Expects a CSV with columns from Splunk's `fieldsummary` command, including `field` and `values`. The `values` column contains fieldsummary-formatted sample values like:
+Accepts two CSV formats (auto-detected):
 
-```
-[{'value': '192.168.1.50', 'count': 200}, {'value': '10.20.30.40', 'count': 150}]
-```
+1. **Splunk fieldsummary export** — columns: `field`, `count`, `distinct_count`, `values`, etc.
+2. **CAS web UI export** — columns: `Field Name`, `Raw Values`, `Scrubbed Values`, `Count`, `Distinct Count`
 
-The scrubber adds a `scrubbed_values` column to the output while preserving all original columns.
+Both formats are handled automatically. Output column headers are normalized to `Field Name` and `Scrubbed Values` regardless of input format.
 
 ### Samples Mode
 
@@ -203,4 +228,4 @@ Handles three formats (auto-detected):
 ---
 
 **Machine Data Insights Inc. *"There's Gold In That Data!"™***  
-<a href="https://machinedatainsights.com" target="_blank">machinedatainsights.com</a>  
+<a href="https://machinedatainsights.com" target="_blank">machinedatainsights.com</a>
