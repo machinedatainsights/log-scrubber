@@ -53,7 +53,7 @@ Log sample events are scrubbed in place — the output file contains only scrubb
 Run this SPL in Splunk Web (adjust index, sourcetype, and time range):
 
 ```spl
-search index=<your_index> sourcetype="<your_sourcetype>" earliest=-7d@d latest=now
+index=<your_index> sourcetype="<your_sourcetype>" earliest=-7d@d latest=now
 | fieldsummary maxvals=5
 | search field!="_*" AND field!="date_*" AND field!="linecount"
   AND field!="punct" AND field!="timestartpos" AND field!="timeendpos"
@@ -65,7 +65,7 @@ Click **Export** → choose **CSV** → save the file (e.g., `guardduty_fields.c
 ### 2. Export Log Samples from Splunk Web
 
 ```spl
-search index=<your_index> sourcetype="<your_sourcetype>" earliest=-1d@d latest=now
+index=<your_index> sourcetype="<your_sourcetype>" earliest=-1d@d latest=now
 | dedup punct | head 20
 ```
 
