@@ -1,4 +1,6 @@
 # Log Scrubbing Configuration
+# For use with CIM Normalization Automation Suite and log_scrubber.py
+
 # This file is automatically loaded when scrubbing is enabled
 # You can override it by uploading a custom config in the UI
 # Comments and blank lines are ignored

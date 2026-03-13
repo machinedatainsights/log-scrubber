@@ -1,7 +1,5 @@
 # Log Scrubber — User Guide
 
-**Machine Data Insights Inc.** | <a href="https://machinedatainsights.com" target="_blank">machinedatainsights.com</a>
-
 `log_scrubber.py` is a standalone command-line utility for scrubbing PII and sensitive data from Splunk field-value exports and log samples. Uses the same scrubbing algorithm and configuration format as the CIM Automation Suite (CAS) web interface.
 
 **No dependencies** beyond Python 3.9+ standard library.
@@ -194,3 +192,16 @@ Handles three formats (auto-detected):
 **Large JSON events (GuardDuty, CloudTrail, etc.)** are handled natively — the scrubber parses JSON at any nesting depth and applies `@json` rules recursively, including AWS/Azure/GCP tag structures.
 
 **Add rules incrementally.** Start with the built-in regex patterns, review the output, then add `@json` and text rules to the config for anything that slipped through.
+
+---
+
+## Version History
+
+### v1.0.0 (Original)
+- Initial adaptation from the CIM Normalization Automation Suite (CAS)
+
+---
+
+**Machine Data Insights Inc. *"There's Gold In That Data!"™***
+
+
