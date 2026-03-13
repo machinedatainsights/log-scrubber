@@ -202,6 +202,5 @@ Handles three formats (auto-detected):
 
 ---
 
-**Machine Data Insights Inc. *"There's Gold In That Data!"™***
-
-
+**Machine Data Insights Inc. *"There's Gold In That Data!"™***  
+<a href="https://machinedatainsights.com" target="_blank">machinedatainsights.com</a>  
