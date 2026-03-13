@@ -223,6 +223,7 @@ Handles three formats (auto-detected):
 ## Version History
 
 ### v1.0.0 (Original)
+- 03/13/2026
 - Initial adaptation from the CIM Normalization Automation Suite (CAS)
 
 ---
